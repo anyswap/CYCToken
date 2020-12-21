@@ -698,7 +698,9 @@ contract MasterChef is Ownable {
         if (block.number > pool.lastRewardBlock && lpSupply != 0) {
             uint256 multiplier = block.number.sub(pool.lastRewardBlock);
             uint256 tokenReward = multiplier.mul(rewardSharePerBlock()).mul(pool.allocPoint).div(totalAllocPoint);
-            accRewardPerShare = accRewardPerShare.add(tokenReward.mul(accRewardMultiplier).div(lpSupply));
+            uint256 tradeReward = tokenReward.div(5);
+            uint256 poolReward = tokenReward.sub(tradeReward);
+            accRewardPerShare = accRewardPerShare.add(poolReward.mul(accRewardMultiplier).div(lpSupply));
         }
         return user.amount.mul(accRewardPerShare).div(accRewardMultiplier).sub(user.rewardDebt).mul(rewardToken.perShareAmount());
     }
@@ -711,26 +713,31 @@ contract MasterChef is Ownable {
         }
     }
 
-    // Update reward variables of the given pool to be up-to-date.
-    function updatePool(uint256 _pid) public {
+    // Update reduce cycle
+    function updateReduce() public {
         while (block.number >= lastReduceBlock.add(reduceCycle)) {
             lastReduceBlock = lastReduceBlock.add(reduceCycle);
             _rewardSharePerBlock = _rewardSharePerBlock.mul(reducePercent).div(100);
         }
+    }
+
+    // Update reward variables of the given pool to be up-to-date.
+    function updatePool(uint256 _pid) public {
+        updateReduce();
         PoolInfo storage pool = poolInfo[_pid];
         if (block.number <= pool.lastRewardBlock) {
             return;
         }
         uint256 lpSupply = pool.lpToken.balanceOf(address(this));
-        if (lpSupply == 0) {
-            pool.lastRewardBlock = block.number;
-            return;
-        }
         uint256 multiplier = block.number.sub(pool.lastRewardBlock);
         uint256 tokenReward = multiplier.mul(_rewardSharePerBlock).mul(pool.allocPoint).div(totalAllocPoint);
-        rewardToken.mint(tradeRewardAddr, tokenReward.div(4)); // 20% to tradeRewardAddr
-        rewardToken.mint(address(this), tokenReward);
-        pool.accRewardPerShare = pool.accRewardPerShare.add(tokenReward.mul(accRewardMultiplier).div(lpSupply));
+        if (tokenReward > 0 && lpSupply > 0) {
+            uint256 tradeReward = tokenReward.div(5);
+            uint256 poolReward = tokenReward.sub(tradeReward);
+            rewardToken.mint(tradeRewardAddr, tradeReward); // 20% to tradeRewardAddr
+            rewardToken.mint(address(this), poolReward);
+            pool.accRewardPerShare = pool.accRewardPerShare.add(poolReward.mul(accRewardMultiplier).div(lpSupply));
+        }
         pool.lastRewardBlock = block.number;
     }
 
