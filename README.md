@@ -15,6 +15,7 @@ npm install
 ```shell
 truffle-flattener internal/CYCToken.sol | sed '/SPDX-License-Identifier:/d' | sed 1i'// SPDX-License-Identifier: MIT' > contracts/CYCToken.sol
 truffle-flattener internal/MasterChef.sol | sed '/SPDX-License-Identifier:/d' | sed 1i'// SPDX-License-Identifier: MIT' > contracts/MasterChef.sol
+truffle-flattener internal/RewardMasterChef.sol | sed '/SPDX-License-Identifier:/d' | sed 1i'// SPDX-License-Identifier: MIT' > contracts/RewardMasterChef.sol
 ```
 
 ## compile
