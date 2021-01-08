@@ -26,7 +26,7 @@ contract RewardMasterChef is Ownable {
     }
 
     // mutiplier make accumulated REWARDs per share more accurate
-    uint256 public accRewardMultiplier;
+    uint256 public accRewardMultiplier = 1e12;
 
     // The REWARD TOKEN!
     IERC20 public rewardToken;
@@ -56,18 +56,11 @@ contract RewardMasterChef is Ownable {
     constructor(
         IERC20 _rewardToken,
         uint256 _startBlock,
-        uint256 _rewardPerBlock,
-        uint256 _accRewardMultiplier,
-        uint256 _reduceCycle,
-        uint256 _reducePercent
+        uint256 _rewardPerBlock
     ) public {
         rewardToken = _rewardToken;
         startBlock = _startBlock > 0 ? _startBlock : block.number;
         rewardPerBlock = _rewardPerBlock;
-        accRewardMultiplier = _accRewardMultiplier > 0 ? _accRewardMultiplier : 1e12;
-        reduceCycle = _reduceCycle > 0 ? _reduceCycle : 57600;
-        reducePercent = _reducePercent > 0 ? _reducePercent : 50;
-        lastReduceBlock = startBlock;
     }
 
     function poolLength() external view returns (uint256) {
@@ -138,6 +131,9 @@ contract RewardMasterChef is Ownable {
 
     // Update reduce cycle
     function updateReduce() public {
+        if (reduceCycle == 0 || reducePercent == 100) {
+            return;
+        }
         while (block.number >= lastReduceBlock.add(reduceCycle)) {
             lastReduceBlock = lastReduceBlock.add(reduceCycle);
             rewardPerBlock = rewardPerBlock.mul(reducePercent).div(100);
