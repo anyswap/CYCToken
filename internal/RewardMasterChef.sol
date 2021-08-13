@@ -48,6 +48,8 @@ contract RewardMasterChef is Ownable {
     uint256 public totalAllocPoint = 0;
     // The block number when REWARD mining starts.
     uint256 public startBlock;
+    // The block number when REWARD mining ends.
+    uint256 public endBlock;
 
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
@@ -65,6 +67,15 @@ contract RewardMasterChef is Ownable {
 
     function poolLength() external view returns (uint256) {
         return poolInfo.length;
+    }
+
+    function _getCurRewardBlock() internal view returns (uint256) {
+        return (block.number > endBlock && endBlock > 0) ? endBlock : block.number;
+    }
+
+    function setEndBlock(uint256 _endBlock) public onlyOwner {
+        require(_endBlock >= startBlock && _endBlock >= block.number, "end block is too low");
+        endBlock = _endBlock;
     }
 
     function setRewardPerBlock(uint256 _rewardPerBlock, bool _withUpdate) public onlyOwner {
@@ -113,8 +124,9 @@ contract RewardMasterChef is Ownable {
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accRewardPerShare = pool.accRewardPerShare;
         uint256 lpSupply = pool.lpToken.balanceOf(address(this));
-        if (block.number > pool.lastRewardBlock && lpSupply != 0) {
-            uint256 multiplier = block.number.sub(pool.lastRewardBlock);
+        uint256 curRewardBlock = _getCurRewardBlock();
+        if (curRewardBlock > pool.lastRewardBlock && lpSupply != 0) {
+            uint256 multiplier = curRewardBlock.sub(pool.lastRewardBlock);
             uint256 tokenReward = multiplier.mul(rewardPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
             accRewardPerShare = accRewardPerShare.add(tokenReward.mul(accRewardMultiplier).div(lpSupply));
         }
@@ -144,11 +156,15 @@ contract RewardMasterChef is Ownable {
     function updatePool(uint256 _pid) public {
         updateReduce();
         PoolInfo storage pool = poolInfo[_pid];
-        if (block.number <= pool.lastRewardBlock) {
+        uint256 curRewardBlock = _getCurRewardBlock();
+        if (curRewardBlock <= pool.lastRewardBlock) {
+            if (rewardPerBlock > 0 && endBlock > 0 && block.number > endBlock.add(1000)) {
+                rewardPerBlock = 0; // wait 1000 blocks for last pool updates of settlements
+            }
             return;
         }
         uint256 lpSupply = pool.lpToken.balanceOf(address(this));
-        uint256 multiplier = block.number.sub(pool.lastRewardBlock);
+        uint256 multiplier = curRewardBlock.sub(pool.lastRewardBlock);
         uint256 tokenReward = multiplier.mul(rewardPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
         if (tokenReward > 0 && lpSupply > 0) {
             rewardToken.safeTransferFrom(rewardSender, address(this), tokenReward);
